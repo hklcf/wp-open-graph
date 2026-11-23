@@ -3,7 +3,7 @@
  * Plugin Name: WP Open Graph
  * Plugin URI: https://github.com/hklcf/wp-open-graph
  * Description: Open Graph and Twitter Card meta tags for posts, pages and the home page, so shared links show a proper title, description and image. Image fallback: featured image, first image in the content, default image from settings, site icon.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: HKLCF
  * Author URI: https://github.com/hklcf
  * License: GPLv2 or later
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPOG_VERSION', '1.0.0' );
+define( 'WPOG_VERSION', '1.0.1' );
 define( 'WPOG_SETTINGS_OPTION', 'wp_open_graph_settings' );
 
 /* ------------------------------------------------------------------ */
@@ -145,10 +145,23 @@ function wpog_get_description() {
 	}
 	$text = wp_strip_all_tags( (string) $text );
 	$text = trim( (string) preg_replace( '/\s+/', ' ', $text ) );
-	if ( function_exists( 'mb_strlen' ) && mb_strlen( $text ) > 300 ) {
-		$text = mb_substr( $text, 0, 297 ) . '...';
-	} elseif ( strlen( $text ) > 300 ) {
-		$text = substr( $text, 0, 297 ) . '...';
+	// Cap at 200 characters and cut at a sentence break so the
+	// description never ends mid-word. A space only counts as a
+	// break when there is no sentence punctuation (Latin text);
+	// inside Chinese text spaces also appear mid-phrase, for
+	// example in "¥2,500 (約 HK$130)". The break is only used
+	// when it keeps at least half the text; otherwise hard-cut.
+	$limit = 200;
+	if ( function_exists( 'mb_strlen' ) && mb_strlen( $text ) > $limit ) {
+		$cut = mb_substr( $text, 0, $limit );
+		if ( preg_match( '/^(.*[。！？；：、，.!?])[^。！？；：、，.!?]*$/u', $cut, $matches ) && mb_strlen( $matches[1] ) >= $limit / 2 ) {
+			$cut = rtrim( $matches[1] );
+		} elseif ( preg_match( '/^(.*\s)\S*$/u', $cut, $matches ) && mb_strlen( $matches[1] ) >= $limit / 2 ) {
+			$cut = rtrim( $matches[1] );
+		}
+		$text = $cut . '…';
+	} elseif ( strlen( $text ) > $limit ) {
+		$text = substr( $text, 0, $limit ) . '…';
 	}
 	return $text;
 }
